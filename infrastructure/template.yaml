@@ -1,0 +1,372 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: ClosetMind - Smart Outfit Planning System
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs18.x
+    MemorySize: 512
+    Environment:
+      Variables:
+        USERS_TABLE: !Ref UsersTable
+        WARDROBE_TABLE: !Ref WardrobeTable
+        OUTFITS_TABLE: !Ref OutfitsTable
+        EVENTS_TABLE: !Ref EventsTable
+        USER_POOL_ID: !Ref CognitoUserPool
+        USER_POOL_CLIENT_ID: !Ref CognitoUserPoolClient
+        WEATHER_API_KEY: !Ref WeatherApiKey
+
+Parameters:
+  WeatherApiKey:
+    Type: String
+    Description: OpenWeatherMap API Key (optional)
+    Default: ""
+    NoEcho: true
+
+Resources:
+  # Cognito User Pool
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: closetmind-users
+      AutoVerifiedAttributes: []
+      UsernameAttributes:
+        - email
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: false
+        - Name: name
+          Required: true
+          Mutable: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: closetmind-client
+      UserPoolId: !Ref CognitoUserPool
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      GenerateSecret: false
+
+  # DynamoDB Tables
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: closetmind-users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+
+  WardrobeTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: closetmind-wardrobe
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: itemId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: itemId
+          KeyType: RANGE
+
+  OutfitsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: closetmind-outfits
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: date
+          KeyType: RANGE
+
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: closetmind-events
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: eventId
+          KeyType: RANGE
+
+  # API Gateway
+  ClosetMindApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: closetmind-api
+      StageName: prod
+      Cors:
+        AllowMethods: "'*'"
+        AllowHeaders: "'*'"
+        AllowOrigin: "'*'"
+      GatewayResponses:
+        DEFAULT_4XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'*'"
+              Access-Control-Allow-Headers: "'*'"
+        DEFAULT_5XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'*'"
+              Access-Control-Allow-Headers: "'*'"
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt CognitoUserPool.Arn
+
+  # Lambda Functions
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: dist/handlers/auth.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:*
+              Resource: !GetAtt CognitoUserPool.Arn
+      Events:
+        SignupOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /auth/signup
+            Method: OPTIONS
+            Auth:
+              Authorizer: NONE
+        Signup:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /auth/signup
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        LoginOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /auth/login
+            Method: OPTIONS
+            Auth:
+              Authorizer: NONE
+        Login:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /auth/login
+            Method: POST
+            Auth:
+              Authorizer: NONE
+
+  WardrobeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: dist/handlers/wardrobe.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WardrobeTable
+      Events:
+        GetItems:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /wardrobe/items
+            Method: GET
+        AddItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /wardrobe/items
+            Method: POST
+        UpdateItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /wardrobe/items/{itemId}
+            Method: PUT
+        DeleteItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /wardrobe/items/{itemId}
+            Method: DELETE
+
+  OutfitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: dist/handlers/outfit.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OutfitsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WardrobeTable
+      Events:
+        GetOutfits:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /outfits
+            Method: GET
+        LogOutfit:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /outfits
+            Method: POST
+        UpdateOutfit:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /outfits/{date}
+            Method: PUT
+        DeleteOutfit:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /outfits/{date}
+            Method: DELETE
+
+  EventsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: dist/handlers/events.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+      Events:
+        GetEvents:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /events
+            Method: GET
+        CreateEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /events
+            Method: POST
+        UpdateEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /events/{eventId}
+            Method: PUT
+        DeleteEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /events/{eventId}
+            Method: DELETE
+
+  SuggestionsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: dist/handlers/suggestions.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref WardrobeTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref OutfitsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+      Events:
+        GetSuggestions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /suggestions
+            Method: GET
+
+  AnalyticsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: dist/handlers/analytics.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref WardrobeTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref OutfitsTable
+      Events:
+        GetAnalytics:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /analytics
+            Method: GET
+
+  NotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: dist/handlers/notification.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+      Events:
+        GetPreferences:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /user/preferences
+            Method: GET
+        UpdatePreferences:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClosetMindApi
+            Path: /user/preferences
+            Method: PUT
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ClosetMindApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref CognitoUserPool
+  
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref CognitoUserPoolClient
