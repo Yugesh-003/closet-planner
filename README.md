@@ -1,38 +1,46 @@
 # ClosetMind - Smart Outfit Planning System
 
-A women-centric smart outfit planning application built with React, AWS Lambda, and DynamoDB.
+A women-centric wardrobe management and outfit planning application built with React, TypeScript, and AWS serverless architecture.
+
+## What It Does
+
+ClosetMind helps you organize your wardrobe digitally and plan outfits efficiently. Think of it as a personal closet assistant that remembers what you own, tracks what you wear, and helps you plan outfits for upcoming events.
 
 ## Features
+- **Wardrobe Management**: Add, edit, and delete clothing items with detailed attributes (type, color, fabric, occasion tags, comfort level, weather suitability)
+- **Usage Tracking**: Automatically tracks how many times you've worn each item and when you last wore it
+- **Calendar View**: Visual monthly calendar to log and view your daily outfits
+- **Event Management**: Create and manage upcoming events (office, college, party, function, interview, casual)
+- **Analytics Dashboard**: See your most worn items, least worn items, and outfit frequency statistics
+- **User Authentication**: Secure signup and login with AWS Cognito
 
-- 👤 User authentication with AWS Cognito
-- 👗 Wardrobe management with detailed item attributes
-- 📅 Calendar-based outfit logging
-- 📆 Event planning and management
-- 🤖 Smart outfit suggestions based on weather and events
-- 📱 SMS reminders for upcoming events
-- 📊 Outfit usage analytics
+
+### Future plans
+- **SMS Notifications**: SMS alerts for event reminders
+- **Image Upload**: Image uploads for wardrobe items
+- **Weather Integration**: Backend has weather API support but not actively used in current version
+
 
 ## Tech Stack
 
 ### Frontend
-- React 18 with TypeScript
-- Vite for build tooling
-- Tailwind CSS for styling
-- React Query for state management
-- React Router for navigation
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **Tailwind CSS** for styling
+- **React Router v6** for navigation
+- **Axios** for API calls
+- **React Hooks** for state management
 
 ### Backend
-- AWS Lambda (Node.js/TypeScript)
-- Amazon API Gateway
-- Amazon DynamoDB
-- Amazon Cognito
-- Amazon SNS (SMS notifications)
-- Amazon EventBridge (scheduled reminders)
-- Amazon S3 (optional image storage)
+- **AWS Lambda** (Node.js/TypeScript) - 7 serverless functions
+- **Amazon API Gateway** - REST API with CORS support
+- **Amazon DynamoDB** - NoSQL database (4 tables: Users, Wardrobe, Outfits, Events)
+- **Amazon Cognito** - User authentication and authorization
 
 ### Infrastructure
-- AWS SAM for infrastructure as code
-- AWS Amplify Hosting for frontend
+- **AWS SAM** (Serverless Application Model) for infrastructure as code
+- **CloudFormation** for resource provisioning
+- **CloudWatch** for logging and monitoring
 
 ## 📁 Project Structure
 
@@ -61,40 +69,78 @@ closetmind/
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ and npm
-- AWS Account (free tier eligible)
-- AWS CLI configured (`aws configure`)
-- AWS SAM CLI installed ([Installation Guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html))
-- OpenWeatherMap API key (free at [openweathermap.org](https://openweathermap.org/api))
+- **Node.js 18+** and npm
+- **AWS Account** (free tier eligible)
+- **AWS CLI** configured with credentials (`aws configure`)
+- **AWS SAM CLI** installed ([Installation Guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html))
 
 ### Installation & Deployment
 
+#### 1. Clone and Install Dependencies
 ```bash
-# 1. Clone and install dependencies
 git clone <your-repo-url>
 cd closetmind
 
-cd backend && npm install && cd ..
-cd frontend && npm install && cd ..
+# Install backend dependencies
+cd backend
+npm install
 
-# 2. Deploy backend to AWS
-cd backend && npm run build && cd ../infrastructure
+# Install frontend dependencies
+cd ../frontend
+npm install
+```
+
+#### 2. Deploy Backend to AWS
+```bash
+# Build backend
+cd ../backend
+npm run build
+
+# Deploy with SAM
+cd ../infrastructure
 sam build
 sam deploy --guided
-# ⚠️ SAVE THE OUTPUTS (ApiEndpoint, UserPoolId, UserPoolClientId)
+```
 
-# 3. Configure frontend environment
+**During `sam deploy --guided`:**
+- Stack Name: `closetmind-stack`
+- AWS Region: `us-east-1` (or your preferred region)
+- Parameter WeatherApiKey: Just press Enter (optional, not used yet)
+- Confirm changes: `y`
+- Allow IAM role creation: `y`
+- Disable rollback: `n`
+- Save arguments: `y`
+
+**⚠️ IMPORTANT**: After deployment completes, save these outputs:
+- `ApiEndpoint` (API Gateway URL)
+- `UserPoolId` (Cognito User Pool ID)
+- `UserPoolClientId` (Cognito Client ID)
+
+#### 3. Configure Frontend
+```bash
 cd ../frontend
-cp .env.example .env
-# Edit .env with values from SAM deployment outputs
+```
 
-# 4. Run locally
+Edit `frontend/.env` and add the values from SAM deployment:
+```env
+VITE_API_URL=https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod
+VITE_USER_POOL_ID=us-east-1_xxxxxxxxx
+VITE_USER_POOL_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+VITE_AWS_REGION=us-east-1
+```
+
+#### 4. Run Locally
+```bash
 npm run dev
 ```
 
-Open `http://localhost:5173` and start using ClosetMind!
+Open `http://localhost:5173` in your browser!
 
-📖 **Complete deployment guide with API setup**: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
+### 🎮 Try the Demo
+Use the test account to explore the app without creating an account:
+- **Email**: test@test.com
+- **Password**: Test1234
+- **Note**: This account works completely offline with pre-loaded demo data
 
 ---
 
@@ -137,79 +183,153 @@ closetmind/
 
 ## 🧪 Development
 
+### Frontend Commands
 ```bash
-# Frontend development
 cd frontend
-npm run dev          # Start dev server
+npm run dev          # Start dev server (http://localhost:5173)
 npm run build        # Production build
 npm run preview      # Preview production build
-
-# Backend development
-cd backend
-npm run build        # Compile TypeScript
-npm run watch        # Watch mode
-
-# Infrastructure
-cd infrastructure
-sam build            # Build SAM application
-sam deploy           # Deploy to AWS
-sam local start-api  # Test locally
 ```
+
+### Backend Commands
+```bash
+cd backend
+npm run build        # Compile TypeScript to JavaScript
+```
+
+### Infrastructure Commands
+```bash
+cd infrastructure
+sam build            # Build Lambda functions
+sam deploy           # Deploy/update AWS resources
+sam delete           # Delete entire stack (cleanup)
+sam logs             # View CloudWatch logs
+```
+
+### Making Changes
+
+**Frontend Changes**: Just save the file - Vite hot-reloads automatically
+
+**Backend Changes**: 
+1. Edit code in `backend/src/handlers/`
+2. Run `npm run build` in backend folder
+3. Run `sam build` then `sam deploy` in infrastructure folder
+4. Changes are live in AWS
 
 ---
 
-## 🚀 Production Deployment
+## 🌐 Production Deployment
 
-### Backend (AWS)
-Already deployed via `sam deploy` - updates automatically on redeploy.
-
-### Frontend Options
-
-**Option 1: Vercel (Recommended)**
+### Backend
+Backend is already deployed to AWS via `sam deploy`. To update:
 ```bash
-npm install -g vercel
-cd frontend
-vercel
-# Add environment variables in Vercel dashboard
+cd backend && npm run build
+cd ../infrastructure
+sam build && sam deploy
 ```
 
-**Option 2: AWS Amplify**
-- Connect GitHub repository
-- Configure build settings
-- Add environment variables
-- Auto-deploys on push
+### Frontend
+The frontend currently runs locally. For production deployment, you have several options:
 
-**Option 3: S3 + CloudFront**
+**Option 1: Vercel (Easiest)**
+1. Push code to GitHub
+2. Import project in Vercel dashboard
+3. Add environment variables from `.env`
+4. Deploy automatically
+
+**Option 2: Netlify**
+1. Push code to GitHub
+2. Connect repository in Netlify
+3. Build command: `npm run build`
+4. Publish directory: `dist`
+5. Add environment variables
+
+**Option 3: AWS Amplify**
+1. Connect GitHub repository in AWS Amplify Console
+2. Configure build settings (auto-detected)
+3. Add environment variables
+4. Auto-deploys on every push
+
+**Option 4: Manual (S3 + CloudFront)**
 ```bash
 cd frontend
 npm run build
-aws s3 sync dist/ s3://your-bucket --delete
+# Upload dist/ folder to S3 bucket configured for static hosting
 ```
 
-See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed instructions.
-
 ---
 
-## 💰 Cost Estimate
+## 🗑️ Cleanup (Delete Everything)
 
-**AWS Free Tier** (first 12 months):
-- Lambda: 1M requests/month free
-- DynamoDB: 25GB storage free
-- API Gateway: 1M requests/month free
-- Cognito: 50,000 MAU free (forever)
+To avoid any AWS charges, delete all resources:
 
-**After free tier**: ~$5-10/month for light usage
+```bash
+cd infrastructure
+sam delete --stack-name closetmind-stack --region us-east-1
+```
 
----
+This removes:
+- All Lambda functions
+- API Gateway
+- DynamoDB tables (and all data!)
+- Cognito User Pool
+- IAM roles
+- CloudWatch logs
 
-## 🆘 Troubleshooting
+**Note**: The SAM deployment S3 bucket is not auto-deleted. To remove it:
+```bash
+# List SAM buckets
+aws s3 ls | findstr samclisourcebucket
 
-See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for common issues and solutions.
+# Delete bucket (replace with your bucket name)
+aws s3 rm s3://aws-sam-cli-managed-default-samclisourcebucket-xxxxx --recursive
+aws s3 rb s3://aws-sam-cli-managed-default-samclisourcebucket-xxxxx
+```
 
-## License
+## 🐛 Common Issues
 
-MIT
+### "CORS error" in browser console
+- Check that API Gateway URL in `.env` is correct
+- Verify CORS is enabled in `infrastructure/template.yaml`
+- Try hard refresh: `Ctrl + Shift + R`
 
-## Author
+### "Cannot find module" errors
+- Run `npm install` in both `frontend/` and `backend/` folders
+- Delete `node_modules` and reinstall if issues persist
 
-Built with AI-DLC workflow
+### Changes not appearing after deployment
+- Run `sam build` before `sam deploy`
+- Check CloudWatch logs: `sam logs --stack-name closetmind-stack`
+- Verify Lambda function code updated in AWS Console
+
+### Test account not working
+- Clear browser localStorage (F12 → Application → Local Storage → Clear)
+- Hard refresh the page
+- Check browser console for errors
+
+## 📚 Project Documentation
+
+- **API_CONFIGURATION.md** - API endpoints and request/response formats
+- **DEPLOYMENT_GUIDE.md** - Detailed deployment instructions
+- **BUILD_STATUS.md** - Implementation status and roadmap
+- **PROJECT_ARTICLE.md** - Comprehensive project overview for articles
+
+## 🤝 Contributing
+
+Suggestions and feedbacks are welcome! Feel free to:
+- Open issues for bugs or feature requests
+- Fork and experiment with your own version
+- Share your experience using the app
+
+## 📄 License
+
+MIT License - feel free to use this project for learning or personal use.
+
+
+## 🙏 Acknowledgments
+
+- AWS for generous free tier
+- React and Vite communities
+- Tailwind CSS for rapid UI development
+
+Created by *Yugesh*
